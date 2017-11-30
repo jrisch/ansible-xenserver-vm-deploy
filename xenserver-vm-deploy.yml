@@ -104,8 +104,8 @@
 #    - name: Add host to runtime inventory
 #      add_host:
 #        name="{{ ipaddress }}"
-#        groups="provisioned"
+#        groups="deployed_vms"
 
 #    - name: Gather facts for first time
 #      setup:
-  #      delegate_to: provisioned
+  #      delegate_to: deployed_vms
