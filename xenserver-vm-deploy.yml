@@ -101,11 +101,16 @@
       async: 1800
       poll: 15
 
-#    - name: Add host to runtime inventory
-#      add_host:
-#        name="{{ ipaddress }}"
-#        groups="deployed_vms"
+    - name: Add host to runtime inventory
+      add_host:
+        name="{{ ipaddress }}"
+        groups="deployed_vms"
+        
+- name: Install Xentools on deployed vm
+  hosts: deployed_vms
+  
+  tasks:
 
-#    - name: Gather facts for first time
-#      setup:
-  #      delegate_to: deployed_vms
+    - name: Gather facts for first time
+      setup:
+        delegate_to: deployed_vms
