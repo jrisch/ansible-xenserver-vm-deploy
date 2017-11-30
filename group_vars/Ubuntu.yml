@@ -1,0 +1,3 @@
+---
+install_repository: "http://mirrors.telianet.dk/ubuntu/"
+boot_args: '--- quiet console=hvc0 auto=true url=d-i.example.com hostname={{ hostname }} domain={{ domainname }} interface={{ interface | default("eth0") }} netcfg/disable_autoconfig=true netcfg/get_ipaddress={{ ipaddress }} netcfg/get_netmask={{ netmask | default("255.255.255.0") }} netcfg/get_gateway={{ gateway }} netcfg/get_nameservers="{{ dnsservers }}" locale=en_US console-setup/ask_detect=false locale=en_US.UTF-8 console-setup/layoutcode=Denmark debian-installer/keymap=dk-latin1 DEBCONF_INTERFACE=noninteractive priority=critical environment={{ runtime_environment | default("production") }}'

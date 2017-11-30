@@ -1,0 +1,13 @@
+---
+hostname: vm01
+domainname: example.com
+gateway: 192.168.1.1
+dnsservers: "8.8.8.8"
+network_name: "Network 0"
+sr_name: "Local storage"
+vm_template: "Debian Stretch 9.0 (64-bit)"
+vm_name: "vm01"
+ipaddress: 192.168.1.10
+vps_type: VM-S
+runtime_environment: testing
+vcpus: 1

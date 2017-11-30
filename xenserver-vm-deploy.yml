@@ -1,0 +1,111 @@
+---
+- name: Deploy new Debian or Ubuntu VPS
+  hosts: xenservers
+  remote_user: root
+  vars_files:
+    - xenserver_vars.yml
+
+  tasks:
+
+    - name: Load VPS specs for chosen type
+      set_fact:
+        memory: "{{ lookup('csvfile', '{{ vps_type }} file=vmtypes.csv delimiter=, col=3') }}"
+        cpu_weight: "{{ lookup('csvfile', '{{ vps_type }} file=vmtypes.csv delimiter=, col=2') }}"
+        disksize: "{{ lookup('csvfile', '{{ vps_type }} file=vmtypes.csv delimiter=, col=1') }}"
+
+    - name: Get UUID of share SR
+      command: xe sr-list name-label="{{ sr_name }}" --minimal
+      register: sruuid
+
+    - name: Get the UUID of the VM template
+      command: xe template-list name-label="{{ vm_template }}" --minimal
+      register: templateuuid
+
+    - name: Get the UUID of the network
+      command: xe network-list name-label="{{ network_name }}" --minimal
+      register: networkuuid
+
+    - name: Deploy new VM
+      command: xe vm-install template={{ templateuuid.stdout }} new-name-label="{{ vm_name }} - {{ ipaddress }} - {{ vps_type }}" sr-uuid={{ sruuid.stdout }}
+      register: vmuuid
+
+    - name: Set vcpu priority
+      command: xe vm-param-set VCPUs-params:weight={{ cpu_weight }} uuid={{ vmuuid.stdout }}
+
+    - name: Set vcpu count max
+      command: xe vm-param-set VCPUs-max={{ vcpu_count }} uuid={{ vmuuid.stdout }}
+      when: vcpu_count >= "2"
+
+    - name: Set vcpu count at startup
+      command: xe vm-param-set VCPUs-at-startup={{ vcpu_count }} uuid={{ vmuuid.stdout }}
+      when: vcpu_count >= "2"
+
+    - name: Get the UUID of the disk
+      command: xe vm-disk-list vbd-params=device=xvda uuid={{ vmuuid.stdout }} --minimal
+      register: vdiuuid
+
+    - name: Set disk size
+      command: xe vdi-resize disk-size="{{ disksize }}" uuid={{ vdiuuid.stdout }}
+
+    - name: Set memory
+      command: xe vm-memory-limits-set uuid={{ vmuuid.stdout }} dynamic-min="{{ memory }}" dynamic-max="{{ memory }}" static-max="{{ memory }}" static-min="{{ memory }}"
+
+    - name: Attach VM to {{ network_name }}
+      command: xe vif-create vm-uuid={{ vmuuid.stdout }} network-uuid={{ networkuuid.stdout }} mac=random device=0
+
+    - name: Load bootargs and install repo for Debian install
+      include_vars:
+        file=group_vars/Debian.yml
+      when: '"Debian" in vm_template'
+
+    - name: Load bootargs and install repo for Ubuntu install
+      include_vars:
+        file=group_vars/Ubuntu.yml
+      when: '"Ubuntu" in vm_template'
+
+    - name: Set preseed boot options
+      command: xe vm-param-set uuid={{ vmuuid.stdout }} PV-args="{{ boot_args }}"
+
+    - name: Set install repository
+      command: xe vm-param-set uuid={{ vmuuid.stdout }} other-config:install-repository={{ install_repository }}
+
+    - name: Create and attach CDROM drive
+      command: xe vbd-create type=CD device=xvdd vm-uuid={{ vmuuid.stdout }} mode=ro
+
+    - name: Boot VM and start preseed installation
+      command: xe vm-start uuid={{ vmuuid.stdout }}
+
+    - name: Get the boot time for the VM
+      command: xe vm-param-get param-name=start-time  uuid={{ vmuuid.stdout}}
+      register: boottime
+
+    - name: Watch for the first reboot
+      shell: export starttime={{ boottime.stdout }}; while [[ ${starttime} == {{ boottime.stdout }} ]]; do sleep 15; starttime=`xe vm-param-get param-name=start-time uuid={{ vmuuid.stdout }}`; done
+      async: 1800
+      poll: 15
+
+    - name: Insert Xentools CD in CDROM drive
+      command: xe vm-cd-insert cd-name=xs-tools.iso vm={{ vmuuid.stdout }}
+      when: ansible_distribution_major_version|int <= 6
+
+    - name: Insert Xentools CD in CDROM drive
+      command: xe vm-cd-insert cd-name=guest-tools.iso vm={{ vmuuid.stdout }}
+      when: ansible_distribution_major_version|int >= 7
+
+    - name: Get the last boot time for the VM
+      command: xe vm-param-get param-name=start-time  uuid={{ vmuuid.stdout}}
+      register: boottime
+
+    - name: Watch for the last reboot
+      shell: export starttime={{ boottime.stdout }}; while [[ ${starttime} == {{ boottime.stdout }} ]]; do sleep 15; starttime=`xe vm-param-get param-name=start-time uuid={{ vmuuid.stdout }}`; done
+      async: 1800
+      poll: 15
+
+#    - name: Add host to runtime inventory
+#      add_host:
+#        name="{{ ipaddress }}"
+#        groups="provisioned"
+
+#    - name: Gather facts for first time
+#      setup:
+  #      delegate_to: provisioned
