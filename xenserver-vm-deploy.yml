@@ -84,13 +84,18 @@
       async: 1800
       poll: 15
 
-    - name: Insert Xentools CD in CDROM drive
-      command: xe vm-cd-insert cd-name=xs-tools.iso vm={{ vmuuid.stdout }}
+    - name: Set the name of the xentools ISO file | Xenserver 6
+      set_fact:
+        xentools_iso: xs-tools.iso
       when: ansible_distribution_major_version|int <= 6
 
-    - name: Insert Xentools CD in CDROM drive
-      command: xe vm-cd-insert cd-name=guest-tools.iso vm={{ vmuuid.stdout }}
+    - name: Set the name of the xentools ISO file | Xenserver 7
+      set_fact:
+        xentools_iso: guest-tools.iso
       when: ansible_distribution_major_version|int >= 7
+
+    - name: Insert Xentools CD in CDROM drive
+      command: xe vm-cd-insert cd-name={{ xentools_iso }} vm={{ vmuuid.stdout }}
 
     - name: Get the last boot time for the VM
       command: xe vm-param-get param-name=start-time  uuid={{ vmuuid.stdout}}
@@ -105,12 +110,25 @@
       add_host:
         name="{{ ipaddress }}"
         groups="deployed_vms"
-        
+
 - name: Install Xentools on deployed vm
   hosts: deployed_vms
-  
+
   tasks:
 
-    - name: Gather facts for first time
-      setup:
-        delegate_to: deployed_vms
+    - name: Mount xentools CD
+      command: mount /dev/xvdd /mnt
+
+    - name: Run the xentools installer
+      command: /mnt/Linux/install.sh -n
+
+    - name: Unmount the xentools CD
+      command: umount /mnt
+
+- name: Eject xentools CD
+  hosts: xenservers
+
+  tasks:
+
+    - name: Eject the xentools CD
+      command: xe vm-cd-eject vm={{ vmuuid.stdout }}
