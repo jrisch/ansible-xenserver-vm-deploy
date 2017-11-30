@@ -1,4 +1,4 @@
-# Readme for Xenserver and VMWare vm deploys
+# Readme for Xenserver vm deploys
 
 This repo contains Ansible plays that can do automated installs of
 Debian and Ubuntu on Xenserver. A VMWare play is in the works.
